@@ -1,0 +1,51 @@
+{{define "client"}}
+  {{- if .Services}}
+//
+// Client
+//
+
+{{- range .Services}}
+export class {{.Name}} implements {{.Name | serviceInterfaceName}} {
+  private axios: AxiosInstance
+  private path = '/rpc/{{.Name}}/'
+
+  constructor(axiosInstance: AxiosInstance) {
+    this.axios = axiosInstance
+  }
+
+  private url(name: string): string {
+    return this.path + name
+  }
+  {{range .Methods}}
+        {{.Name | methodName}} = ({{. | methodInputs}}): {{. | methodOutputs}} => {
+    return this.axios.post(
+      this.url('{{.Name}}'),
+      {{- if .Inputs | len}}
+      createHTTPRequest(args)
+      {{- else}}
+      createHTTPRequest({})
+      {{end -}},
+      config
+    ).then((res: AxiosResponse) => {
+      let _data = res.data
+
+      if (_data.status && _data.status > 200){
+        if (_data.code === 'internal'){
+          throw {code:_data.code,msg: _data.cause, status:_data.status} as WebRPCError
+        }
+        throw {code:_data.code, msg:_data.msg,status:_data.status} as WebRPCError
+      }
+
+      return {
+      {{- $outputsCount := .Outputs|len -}}
+        {{- range $i, $output := .Outputs}}
+          {{$output | newOutputArgResponse}}{{listComma $i $outputsCount}}
+        {{- end}}
+      }
+    })
+  }
+  {{end}}
+}
+{{end -}}
+  {{end -}}
+{{end}}
