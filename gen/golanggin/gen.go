@@ -1,5 +1,5 @@
 //go:generate statik -src=./templates -dest=. -f -Z -p=embed
-package typescriptaxios
+package golanggin
 
 import (
 	"bytes"
@@ -8,13 +8,14 @@ import (
 	"text/template"
 
 	"github.com/goware/statik/fs"
+	"github.com/pkg/errors"
 	"github.com/webrpc/webrpc/gen"
-	"github.com/webrpc/webrpc/gen/typescriptaxios/embed"
+	"github.com/webrpc/webrpc/gen/golang/embed"
 	"github.com/webrpc/webrpc/schema"
 )
 
 func init() {
-	gen.Register("tsaxios", &generator{})
+	gen.Register("gogin", &generator{})
 }
 
 type generator struct{}
@@ -27,10 +28,13 @@ func (g *generator) Gen(proto *schema.WebRPCSchema, opts gen.TargetOptions) (str
 		return "", err
 	}
 
+	// TODO: we can move a bunch of this code to the core gen package at githb.com/webrpc/webrpc/gen
+	// .. then typescript gen, and others can use it too..
+
 	// Load templates
 	tmpl := template.
-		New("webrpc-gen-nts").
-		Funcs(templateFuncMap)
+		New("webrpc-gen-go").
+		Funcs(templateFuncMap(proto))
 
 	for _, tmplData := range templates {
 		_, err = tmpl.Parse(tmplData)
@@ -54,14 +58,21 @@ func (g *generator) Gen(proto *schema.WebRPCSchema, opts gen.TargetOptions) (str
 		proto, schemaHash, opts,
 	}
 
-	// Generate the template
+	// generate the template
 	genBuf := bytes.NewBuffer(nil)
 	err = tmpl.ExecuteTemplate(genBuf, "proto", vars)
 	if err != nil {
 		return "", err
 	}
 
-	return string(genBuf.Bytes()), nil
+	// return string(genBuf.Bytes()), nil
+
+	src, err := FormatSource(genBuf.Bytes())
+	if err != nil {
+		return "", errors.Errorf("gofmt is failing to format the Go code because: %v", err)
+	}
+
+	return string(src), nil
 }
 
 func getTemplates() (map[string]string, error) {
