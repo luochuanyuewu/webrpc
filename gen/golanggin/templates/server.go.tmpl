@@ -5,7 +5,8 @@
 //
 
 type WebRPCServer interface {
-  http.Handler
+  //http.Handler
+  ServeGin(ctx *gin.Context)
 }
 
 {{- range .Services}}
@@ -22,34 +23,34 @@ type WebRPCServer interface {
     }
   }
 
-  func (s *{{$serviceName}}) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    ctx := r.Context()
-    ctx = context.WithValue(ctx, HTTPResponseWriterCtxKey, w)
-    ctx = context.WithValue(ctx, HTTPRequestCtxKey, r)
-    ctx = context.WithValue(ctx, ServiceNameCtxKey, "{{.Name}}")
+  func (s *{{$serviceName}}) ServeGin(ctx *gin.Context) {
+    ctx.Set(HTTPResponseWriterCtxKey.name, ctx.Writer)
+    ctx.Set(HTTPRequestCtxKey.name, ctx.Request)
+    ctx.Set(ServiceNameCtxKey.name, "{{.Name}}")
 
-    if r.Method != "POST" {
-      err := Errorf(ErrBadRoute, "unsupported method %q (only POST is allowed)", r.Method)
-      RespondWithError(w, err)
-      return
+    if ctx.Request.Method != "POST" {
+    err := Errorf(ErrBadRoute, "unsupported method %q (only POST is allowed)", ctx.Request.Method)
+    RespondWithError(ctx, err)
+    return
     }
 
-    switch r.URL.Path {
+    switch ctx.Request.URL.Path {
     {{- range .Methods}}
-    case "/rpc/{{$name}}/{{.Name}}":
-      s.{{.Name | serviceMethodName}}(ctx, w, r)
+      case "/rpc/{{$name}}/{{.Name}}":
+      s.{{.Name | serviceMethodName}}(ctx)
       return
     {{- end}}
     default:
-      err := Errorf(ErrBadRoute, "no handler for path %q", r.URL.Path)
-      RespondWithError(w, err)
-      return
+    err := Errorf(ErrBadRoute, "no handler for path %q", ctx.Request.URL.Path)
+    RespondWithError(ctx, err)
+    return
     }
   }
 
+
   {{range .Methods}}
-    func (s *{{$serviceName}}) {{.Name | serviceMethodName}}(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-      header := r.Header.Get("Content-Type")
+    func (s *{{$serviceName}}) {{.Name | serviceMethodName}}(ctx *gin.Context) {
+      header := ctx.GetHeader("Content-Type")
       i := strings.Index(header, ";")
       if i == -1 {
         i = len(header)
@@ -57,16 +58,16 @@ type WebRPCServer interface {
 
       switch strings.TrimSpace(strings.ToLower(header[:i])) {
       case "application/json":
-        s.{{ .Name | serviceMethodJSONName }}(ctx, w, r)
+        s.{{ .Name | serviceMethodJSONName }}(ctx)
       default:
-        err := Errorf(ErrBadRoute, "unexpected Content-Type: %q", r.Header.Get("Content-Type"))
-        RespondWithError(w, err)
+        err := Errorf(ErrBadRoute, "unexpected Content-Type: %q", ctx.GetHeader("Content-Type"))
+        RespondWithError(ctx, err)
       }
     }
 
-    func (s *{{$serviceName}}) {{.Name | serviceMethodJSONName}}(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+    func (s *{{$serviceName}}) {{.Name | serviceMethodJSONName}}(ctx *gin.Context) {
       var err error
-      ctx = context.WithValue(ctx, MethodNameCtxKey, "{{.Name}}")
+      ctx.Set(MethodNameCtxKey.name, "{{.Name}}")
 
       {{- if .Inputs|len}}
       reqContent := struct {
@@ -75,20 +76,12 @@ type WebRPCServer interface {
       {{- end}}
       }{}
 
-      reqBody, err := ioutil.ReadAll(r.Body)
-      if err != nil {
-        err = WrapError(ErrInternal, err, "failed to read request data")
-        RespondWithError(w, err)
+      if err := ctx.ShouldBindJSON(&reqContent); err != nil {
+        err = WrapError(ErrInternal, err, "failed to unmarshal request data")
+        RespondWithError(ctx, err)
         return
       }
-      defer r.Body.Close()
 
-      err = json.Unmarshal(reqBody, &reqContent)
-      if err != nil {
-        err = WrapError(ErrInvalidArgument, err, "failed to unmarshal request data")
-        RespondWithError(w, err)
-        return
-      }
       {{- end}}
 
       // Call service method
@@ -99,7 +92,7 @@ type WebRPCServer interface {
         defer func() {
           // In case of a panic, serve a 500 error and then panic.
           if rr := recover(); rr != nil {
-            RespondWithError(w, ErrorInternal("internal service panic"))
+            RespondWithError(ctx, ErrorInternal("internal service panic"))
             panic(rr)
           }
         }()
@@ -114,42 +107,30 @@ type WebRPCServer interface {
       {{- end}}
 
       if err != nil {
-        RespondWithError(w, err)
+        RespondWithError(ctx, err)
         return
       }
 
-      {{- if .Outputs | len}}
-      respBody, err := json.Marshal(respContent)
-      if err != nil {
-        err = WrapError(ErrInternal, err, "failed to marshal json response")
-        RespondWithError(w, err)
-        return
-      }
-      {{- end}}
-
-      w.Header().Set("Content-Type", "application/json")
-      w.WriteHeader(http.StatusOK)
+      //w.Header().Set("Content-Type", "application/json")
+      //w.WriteHeader(http.StatusOK)
 
       {{- if .Outputs | len}}
-      w.Write(respBody)
+        ctx.JSON(http.StatusOK, respContent)
       {{- end}}
     }
   {{end}}
 {{- end}}
 
-func RespondWithError(w http.ResponseWriter, err error) {
-	rpcErr, ok := err.(Error)
-	if !ok {
-		rpcErr = WrapError(ErrInternal, err, "webrpc error")
-	}
+func RespondWithError(ctx *gin.Context, err error) {
+    rpcErr, ok := err.(Error)
+    if !ok {
+    rpcErr = WrapError(ErrInternal, err, "webrpc error")
+    }
 
-	statusCode := HTTPStatusFromErrorCode(rpcErr.Code())
+    statusCode := HTTPStatusFromErrorCode(rpcErr.Code())
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-
-	respBody, _ := json.Marshal(rpcErr.Payload())
-	w.Write(respBody)
+    ctx.JSON(statusCode, rpcErr.Payload())
 }
+
 {{end}}
 {{end}}

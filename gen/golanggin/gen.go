@@ -10,7 +10,7 @@ import (
 	"github.com/goware/statik/fs"
 	"github.com/pkg/errors"
 	"github.com/webrpc/webrpc/gen"
-	"github.com/webrpc/webrpc/gen/golang/embed"
+	"github.com/webrpc/webrpc/gen/golanggin/embed"
 	"github.com/webrpc/webrpc/schema"
 )
 
