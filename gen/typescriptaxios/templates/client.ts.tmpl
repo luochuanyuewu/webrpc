@@ -17,7 +17,7 @@ export class {{.Name}} implements {{.Name | serviceInterfaceName}} {
     return this.path + name
   }
   {{range .Methods}}
-        {{.Name | methodName}} = ({{. | methodInputs}}): {{. | methodOutputs}} => {
+    {{.Name | methodName}} = ({{. | methodInputs}}): {{. | methodOutputs}} => {
     return this.axios.post(
       this.url('{{.Name}}'),
       {{- if .Inputs | len}}
