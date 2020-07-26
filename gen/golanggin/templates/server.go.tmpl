@@ -72,7 +72,7 @@ type WebRPCServer interface {
       {{- if .Inputs|len}}
       reqContent := struct {
       {{- range $i, $input := .Inputs}}
-        Arg{{$i}} {{. | methodArgType}} `json:"{{$input.Name | downcaseName}}"`
+        Arg{{$i}} {{. | methodArgType}} `json:"{{$input.Name | downcaseName}}",binding:"required"`
       {{- end}}
       }{}
 

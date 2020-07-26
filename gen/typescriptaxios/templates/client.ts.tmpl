@@ -17,7 +17,7 @@ export class {{.Name}} implements {{.Name | serviceInterfaceName}} {
     return this.path + name
   }
   {{range .Methods}}
-        {{.Name | methodName}} = ({{. | methodInputs}}): {{. | methodOutputs}} => {
+    {{.Name | methodName}} = ({{. | methodInputs}}): {{. | methodOutputs}} => {
     return this.axios.post(
       this.url('{{.Name}}'),
       {{- if .Inputs | len}}
@@ -27,21 +27,14 @@ export class {{.Name}} implements {{.Name | serviceInterfaceName}} {
       {{end -}},
       config
     ).then((res: AxiosResponse) => {
-      let _data = res.data
-
-      if (_data.status && _data.status > 200){
-        if (_data.code === 'internal'){
-          throw {code:_data.code,msg: _data.cause, status:_data.status} as WebRPCError
-        }
-        throw {code:_data.code, msg:_data.msg,status:_data.status} as WebRPCError
-      }
-
-      return {
-      {{- $outputsCount := .Outputs|len -}}
-        {{- range $i, $output := .Outputs}}
-          {{$output | newOutputArgResponse}}{{listComma $i $outputsCount}}
-        {{- end}}
-      }
+      return buildResponse(res).then(_data=>{
+          return {
+          {{- $outputsCount := .Outputs|len -}}
+            {{- range $i, $output := .Outputs}}
+              {{$output | newOutputArgResponse}}{{listComma $i $outputsCount}}
+            {{- end}}
+          }
+      })
     })
   }
   {{end}}
