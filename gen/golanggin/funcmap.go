@@ -177,6 +177,10 @@ func constPathPrefix(in schema.VarName) (string, error) {
 	return string(in) + "PathPrefix", nil
 }
 
+func constNameSuffix(in schema.VarName) (string, error) {
+	return string(in) + "Name", nil
+}
+
 func countMethods(in []*schema.Method) (string, error) {
 	return strconv.Itoa(len(in)), nil
 }
@@ -323,6 +327,7 @@ func templateFuncMap(proto *schema.WebRPCSchema) map[string]interface{} {
 		"newClientServiceName":  newClientServiceName,
 		"newServerServiceName":  newServerServiceName,
 		"constPathPrefix":       constPathPrefix,
+		"constNameSuffix":       constNameSuffix,
 		"countMethods":          countMethods,
 		"clientServiceName":     clientServiceName,
 		"serverServiceName":     serverServiceName,

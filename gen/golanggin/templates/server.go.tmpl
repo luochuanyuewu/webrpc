@@ -9,6 +9,16 @@ type WebRPCServer interface {
   ServeGin(ctx *gin.Context)
 }
 
+{{range .Services}}
+func Register()
+const {{.Name | constNameSuffix}} = "{{.Name}}"
+{{end}}
+
+
+{{range .Services}}
+const {{.Name | constNameSuffix}} = "{{.Name}}"
+{{end}}
+
 {{- range .Services}}
   {{$name := .Name}}
   {{$serviceName := .Name | serverServiceName}}
