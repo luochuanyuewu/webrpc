@@ -10,12 +10,6 @@ type WebRPCServer interface {
 }
 
 {{range .Services}}
-func Register()
-const {{.Name | constNameSuffix}} = "{{.Name}}"
-{{end}}
-
-
-{{range .Services}}
 const {{.Name | constNameSuffix}} = "{{.Name}}"
 {{end}}
 
@@ -87,7 +81,7 @@ const {{.Name | constNameSuffix}} = "{{.Name}}"
       }{}
 
       if err := ctx.ShouldBindJSON(&reqContent); err != nil {
-        err = WrapError(ErrInternal, err, "failed to unmarshal request data")
+        err = ErrorInvalidArgument("reqContent", err.Error())
         RespondWithError(ctx, err)
         return
       }
